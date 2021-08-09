@@ -3,14 +3,23 @@
 #include "driver/gpio.h"
 
 #if defined(CONFIG_EPD_BOARD_REVISION_V5)
-#define D7 GPIO_NUM_23
-#define D6 GPIO_NUM_22
+
+#if IDF_TARGET == esp32s2
+  #define D7 GPIO_NUM_43
+  #define D6 GPIO_NUM_42
+  #define D0 GPIO_NUM_45
+#else
+  #define D7 GPIO_NUM_23
+  #define D6 GPIO_NUM_22
+  #define D0 GPIO_NUM_25
+#endif
+
 #define D5 GPIO_NUM_21
 #define D4 GPIO_NUM_19
 #define D3 GPIO_NUM_18
 #define D2 GPIO_NUM_5
 #define D1 GPIO_NUM_4
-#define D0 GPIO_NUM_25
+
 
 
 /* Config Reggister Control */

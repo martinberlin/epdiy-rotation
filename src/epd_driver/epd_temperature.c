@@ -9,8 +9,13 @@ static esp_adc_cal_characteristics_t adc_chars;
 #define NUMBER_OF_SAMPLES 100
 
 void epd_temperature_init() {
-  esp_adc_cal_value_t val_type = esp_adc_cal_characterize(
+  #if IDF_TARGET == esp32s2
+    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(
+      ADC_UNIT_1, ADC_ATTEN_DB_6, ADC_WIDTH_BIT_13, 1100, &adc_chars);
+    #else
+    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(
       ADC_UNIT_1, ADC_ATTEN_DB_6, ADC_WIDTH_BIT_12, 1100, &adc_chars);
+  #endif
   if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
     ESP_LOGI("epd_temperature", "Characterized using Two Point Value\n");
   } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
@@ -18,7 +23,12 @@ void epd_temperature_init() {
   } else {
     ESP_LOGI("esp_temperature", "Characterized using Default Vref\n");
   }
-  adc1_config_width(ADC_WIDTH_BIT_12);
+
+  #if IDF_TARGET == esp32s2
+    adc1_config_width(ADC_WIDTH_BIT_13);
+  #else
+    adc1_config_width(ADC_WIDTH_BIT_12);
+  #endif
   adc1_config_channel_atten(channel, ADC_ATTEN_DB_6);
 }
 

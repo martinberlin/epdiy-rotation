@@ -1,6 +1,7 @@
 #include "rmt_pulse.h"
 #include "driver/rmt.h"
 #include "esp_system.h"
+#include "soc/rmt_periph.h"
 
 static intr_handle_t gRMT_intr_handle = NULL;
 
