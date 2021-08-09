@@ -4,7 +4,7 @@
 
 #if defined(CONFIG_EPD_BOARD_REVISION_V5)
 
-#if IDF_TARGET == esp32s2
+#if CONFIG_IDF_TARGET_ESP32S2
   #define D7 GPIO_NUM_43
   #define D6 GPIO_NUM_42
   #define D0 GPIO_NUM_45

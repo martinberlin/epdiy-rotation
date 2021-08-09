@@ -49,7 +49,7 @@ inline static void IRAM_ATTR push_cfg_bit(bool bit) {
 }
 
 void epd_base_init(uint32_t epd_row_width) {
-
+  printf("epd_base_init(%d)\n\n", epd_row_width);
   config_reg_init(&config_reg);
 
   /* Power Control Output/Off */

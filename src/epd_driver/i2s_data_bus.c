@@ -178,7 +178,11 @@ void i2s_bus_init(i2s_bus_config *cfg) {
 
   // Set Audio Clock Dividers
   dev->clkm_conf.val = 0;
-  dev->clkm_conf.clk_en = 1;
+  #if CONFIG_IDF_TARGET_ESP32S2
+    dev->clkm_conf.clk_en = 1;
+  #else 
+    dev->clkm_conf.clka_en = 1;
+  #endif
   dev->clkm_conf.clkm_div_a = 1;
   dev->clkm_conf.clkm_div_b = 0;
   // 2 is the smallest possible divider according to the spec.

@@ -9,7 +9,8 @@ static esp_adc_cal_characteristics_t adc_chars;
 #define NUMBER_OF_SAMPLES 100
 
 void epd_temperature_init() {
-  #if IDF_TARGET == esp32s2
+  printf("epd_temperature_init()\n\n");
+  #if CONFIG_IDF_TARGET_ESP32S2
     esp_adc_cal_value_t val_type = esp_adc_cal_characterize(
       ADC_UNIT_1, ADC_ATTEN_DB_6, ADC_WIDTH_BIT_13, 1100, &adc_chars);
     #else
@@ -24,7 +25,7 @@ void epd_temperature_init() {
     ESP_LOGI("esp_temperature", "Characterized using Default Vref\n");
   }
 
-  #if IDF_TARGET == esp32s2
+  #if CONFIG_IDF_TARGET_ESP32S2
     adc1_config_width(ADC_WIDTH_BIT_13);
   #else
     adc1_config_width(ADC_WIDTH_BIT_12);
