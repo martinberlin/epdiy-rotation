@@ -11,12 +11,13 @@
 #include "soc/rtc.h"
 #include <esp_log.h>
 
-// #1 I2S1 does not support 8 bit-mode, DMA should be sent in 16-bit (Mode 2)
-i2s_dev_t *dev = &I2S1;
-// IS0 needs a slower clock: https://github.com/TobleMiner/esp_i2s_parallel#i2s0-vs-i2s1
+// #1 I2S 0 does not support 8 bit-mode, DMA should be sent in 16-bit
+// (Not sure how to do that part so Dragon still looks pixelated)
+i2s_dev_t *dev = &I2S0;
+// I2S 0 needs a slower clock: https://github.com/TobleMiner/esp_i2s_parallel#i2s0-vs-i2s1
 // But seems that still works also with clk_divider = 2
 const uint8_t clk_divider = 2;
-const uint8_t bus_width = 8;
+const uint8_t bus_width = 16;
 uint16_t printCount = 0;
 
 /// DMA descriptors for front and back line buffer.
@@ -45,7 +46,7 @@ static volatile bool output_done = true;
 /// interrupt.
 static gpio_num_t start_pulse_pin;
 
-// I2S1: Even if you do only need 8 bits of bus-width the data samples provided in memory must still have a width of 16 bit.
+// I2S0: Even if you do only need 8 bits of bus-width the data samples provided in memory must still have a width of 16 bit.
 /// Initializes a DMA descriptor.
 static void fill_dma_desc(volatile lldesc_t *dmadesc, uint8_t *buf,
                           i2s_bus_config *cfg) {
@@ -97,13 +98,13 @@ volatile uint8_t IRAM_ATTR *i2s_get_current_buffer() {
 
 bool IRAM_ATTR i2s_is_busy() {
   // DMA and FIFO must be done
-  return !output_done || !I2S1.state.tx_idle;
+  return !output_done || !I2S0.state.tx_idle;
 }
 
 void IRAM_ATTR i2s_switch_buffer() {
   // either device is done transmitting or the switch must be away from the
   // buffer currently used by the DMA engine.
-  while (i2s_is_busy() && dma_desc_addr() != I2S1.out_link.addr) {
+  while (i2s_is_busy() && dma_desc_addr() != I2S0.out_link.addr) {
   };
   current_buffer = !current_buffer;
 }
@@ -128,25 +129,26 @@ void IRAM_ATTR i2s_start_line_output() {
 }
 
 void i2s_bus_init(i2s_bus_config *cfg) {
-  // TODO: Why?
+  // FIX: No idea how is the order from 8->15
   gpio_num_t I2S_GPIO_BUS[] = {cfg->data_6, cfg->data_7, cfg->data_4,
                                cfg->data_5, cfg->data_2, cfg->data_3,
                                cfg->data_0, cfg->data_1,
                                cfg->data_8, cfg->data_9, cfg->data_10,
                                cfg->data_11, cfg->data_12, cfg->data_13,
-                               cfg->data_14, cfg->data_15,};
+                               cfg->data_14, cfg->data_15 };
 
   gpio_set_direction(cfg->start_pulse, GPIO_MODE_OUTPUT);
   gpio_set_level(cfg->start_pulse, 1);
   // store pin in global variable for use in interrupt.
   start_pulse_pin = cfg->start_pulse;
 
-  // Use I2S1 with no signal offset: I2S1O_DATA_OUT0_IDX 
+  // Use I2S 1 with no signal offset: I2S0O_DATA_OUT0_IDX 
   // (for some reason the offset seems to be needed in 16-bit mode, but not in 8 bit mode)
-  // I2S1 needs to have I2S1O_DATA_OUT8_IDX offset mode
-  int signal_base = I2S1O_DATA_OUT8_IDX;
+  // I2S 0 needs to have I2S 0O_DATA_OUTn_IDX offset mode
+  // Not sure what is the right offset but with 8 works the best
+  int signal_base = I2S0O_DATA_OUT8_IDX; 
   if (bus_width == 8) {
-    signal_base = I2S1O_DATA_OUT0_IDX;
+    signal_base = I2S0O_DATA_OUT0_IDX;
   }
 
   // Setup and route GPIOS
@@ -154,9 +156,9 @@ void i2s_bus_init(i2s_bus_config *cfg) {
     gpio_setup_out(I2S_GPIO_BUS[x], signal_base + x, false);
   }
   // Invert word select signal
-  gpio_setup_out(cfg->clock, I2S1O_WS_OUT_IDX, true);
+  gpio_setup_out(cfg->clock, I2S0O_WS_OUT_IDX, true);
 
-  periph_module_enable(PERIPH_I2S1_MODULE);
+  periph_module_enable(PERIPH_I2S0_MODULE);
   // Initialize device
   dev->conf.tx_reset = 1;
   dev->conf.tx_reset = 0;
@@ -232,7 +234,7 @@ void i2s_bus_init(i2s_bus_config *cfg) {
   SET_PERI_REG_BITS(I2S_INT_ENA_REG(1), I2S_OUT_DONE_INT_ENA_V, 1,
                     I2S_OUT_DONE_INT_ENA_S);
   // register interrupt
-  esp_intr_alloc(ETS_I2S1_INTR_SOURCE, 0, i2s_int_hdl, 0, &gI2S_intr_handle);
+  esp_intr_alloc(ETS_I2S0_INTR_SOURCE, 0, i2s_int_hdl, 0, &gI2S_intr_handle);
 
   // Reset FIFO/DMA
   dev->lc_conf.in_rst = 1;
@@ -273,5 +275,5 @@ void i2s_deinit() {
   free((void *)i2s_state.dma_desc_b);
 
   rtc_clk_apll_enable(0, 0, 0, 8, 0);
-  periph_module_disable(PERIPH_I2S1_MODULE);
+  periph_module_disable(PERIPH_I2S0_MODULE);
 }
