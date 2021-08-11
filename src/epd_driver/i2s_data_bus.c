@@ -16,6 +16,7 @@ i2s_dev_t *dev = &I2S1;
 // IS0 needs a slower clock: https://github.com/TobleMiner/esp_i2s_parallel#i2s0-vs-i2s1
 const uint8_t clk_divider = 4;
 const uint8_t bus_width = 16;
+uint16_t printCount = 0;
 
 /// DMA descriptors for front and back line buffer.
 /// We use two buffers, so one can be filled while the other
@@ -60,9 +61,14 @@ static void fill_dma_desc(volatile lldesc_t *dmadesc, uint8_t *buf,
 /// Address of the currently front DMA descriptor,
 /// which uses only the lower 20bits (according to TRM)
 uint32_t dma_desc_addr() {
-  return (uint32_t)(current_buffer ? i2s_state.dma_desc_a
+  uint32_t dma_addr = (uint32_t)(current_buffer ? i2s_state.dma_desc_a
                                    : i2s_state.dma_desc_b) &
          0x000FFFFF;
+         /* if (printCount<2) {
+            ets_printf("dma_addr:%x\n");
+            printCount++;
+         } */
+         return dma_addr;
 }
 
 /// Set up a GPIO as output and route it to a signal.
@@ -124,7 +130,10 @@ void i2s_bus_init(i2s_bus_config *cfg) {
   // TODO: Why?
   gpio_num_t I2S_GPIO_BUS[] = {cfg->data_6, cfg->data_7, cfg->data_4,
                                cfg->data_5, cfg->data_2, cfg->data_3,
-                               cfg->data_0, cfg->data_1};
+                               cfg->data_0, cfg->data_1,
+                               cfg->data_8, cfg->data_9, cfg->data_10,
+                               cfg->data_11, cfg->data_12, cfg->data_13,
+                               cfg->data_14, cfg->data_15,};
 
   gpio_set_direction(cfg->start_pulse, GPIO_MODE_OUTPUT);
   gpio_set_level(cfg->start_pulse, 1);
@@ -136,14 +145,14 @@ void i2s_bus_init(i2s_bus_config *cfg) {
   int signal_base = I2S1O_DATA_OUT0_IDX;
 
   // Setup and route GPIOS
-  for (int x = 0; x < 8; x++) {
+  for (int x = 0; x < bus_width; x++) {
     gpio_setup_out(I2S_GPIO_BUS[x], signal_base + x, false);
   }
   // Invert word select signal
   gpio_setup_out(cfg->clock, I2S1O_WS_OUT_IDX, true);
 
+  periph_module_reset(PERIPH_I2S1_MODULE);
   periph_module_enable(PERIPH_I2S1_MODULE);
-
   // Initialize device
   dev->conf.tx_reset = 1;
   dev->conf.tx_reset = 0;

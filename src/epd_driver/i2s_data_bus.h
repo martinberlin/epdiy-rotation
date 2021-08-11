@@ -22,6 +22,14 @@ typedef struct {
   gpio_num_t data_5;
   gpio_num_t data_6;
   gpio_num_t data_7;
+  gpio_num_t data_8;
+  gpio_num_t data_9;
+  gpio_num_t data_10;
+  gpio_num_t data_11;
+  gpio_num_t data_12;
+  gpio_num_t data_13;
+  gpio_num_t data_14;
+  gpio_num_t data_15;
 
   /// Data clock pin.
   gpio_num_t clock;

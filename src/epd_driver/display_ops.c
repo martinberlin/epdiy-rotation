@@ -84,7 +84,14 @@ void epd_base_init(uint32_t epd_row_width) {
   i2s_config.data_5 = D5;
   i2s_config.data_6 = D6;
   i2s_config.data_7 = D7;
-
+  i2s_config.data_8 = D8;
+  i2s_config.data_9 = D9;
+  i2s_config.data_10 = D10;
+  i2s_config.data_11 = D11;
+  i2s_config.data_12 = D12;
+  i2s_config.data_13 = D13;
+  i2s_config.data_14 = D14;
+  i2s_config.data_15 = D15;
   i2s_bus_init(&i2s_config);
 
   rmt_pulse_init(CKV);

@@ -20,8 +20,6 @@
 #define D2 GPIO_NUM_5
 #define D1 GPIO_NUM_4
 
-
-
 /* Config Reggister Control */
 #define CFG_DATA GPIO_NUM_33
 #define CFG_CLK GPIO_NUM_32
@@ -38,6 +36,7 @@
 #define CKH GPIO_NUM_15
 
 #else
+
 #define D7 GPIO_NUM_22
 #define D6 GPIO_NUM_21
 #define D5 GPIO_NUM_27
@@ -50,6 +49,17 @@
 #define D2 GPIO_NUM_4
 #define D1 GPIO_NUM_32
 #define D0 GPIO_NUM_33
+
+// Extra 8 bit GPIOs to make 16. IMPORTANT: Not enough free GPIOs in ESP32 to make 16 bit data-bus
+// REF: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
+#define D8 GPIO_NUM_12
+#define D9 GPIO_NUM_12
+#define D10 GPIO_NUM_12
+#define D11 GPIO_NUM_12
+#define D12 GPIO_NUM_12
+#define D13 GPIO_NUM_12
+#define D14 GPIO_NUM_12
+#define D15 GPIO_NUM_12
 
 #define CFG_DATA GPIO_NUM_23
 #define CFG_CLK GPIO_NUM_18
