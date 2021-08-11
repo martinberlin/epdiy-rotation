@@ -8,6 +8,7 @@
 #include <string.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
+#include "esp_timer.h"
 
 #ifndef _swap_int
 #define _swap_int(a, b)                                                        \
@@ -94,6 +95,7 @@ EpdRect _rotated_area(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 }
 
 enum EpdDrawError epd_hl_update_area(EpdiyHighlevelState* state, enum EpdDrawMode mode, int temperature, EpdRect area) {
+  uint64_t startTime = esp_timer_get_time();
   assert(state != NULL);
   // Not right to rotate here since this copies part of buffer directly
   
@@ -139,6 +141,9 @@ enum EpdDrawError epd_hl_update_area(EpdiyHighlevelState* state, enum EpdDrawMod
 	  );
 	}
   }
+  uint64_t updateTime = esp_timer_get_time();
+
+  printf("Update took: %llu ms\n\n", (updateTime-startTime)/1000);
   return err;
 }
 

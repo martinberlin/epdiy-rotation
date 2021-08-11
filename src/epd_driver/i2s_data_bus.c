@@ -9,6 +9,13 @@
 #include "soc/i2s_reg.h"
 #include "soc/i2s_struct.h"
 #include "soc/rtc.h"
+#include <esp_log.h>
+
+// #1 I2S1 does not support 8 bit-mode, DMA should be sent in 16-bit (Mode 2)
+i2s_dev_t *dev = &I2S1;
+// IS0 needs a slower clock: https://github.com/TobleMiner/esp_i2s_parallel#i2s0-vs-i2s1
+const uint8_t clk_divider = 4;
+const uint8_t bus_width = 16;
 
 /// DMA descriptors for front and back line buffer.
 /// We use two buffers, so one can be filled while the other
@@ -36,6 +43,7 @@ static volatile bool output_done = true;
 /// interrupt.
 static gpio_num_t start_pulse_pin;
 
+// I2S1: Even if you do only need 8 bits of bus-width the data samples provided in memory must still have a width of 16 bit.
 /// Initializes a DMA descriptor.
 static void fill_dma_desc(volatile lldesc_t *dmadesc, uint8_t *buf,
                           i2s_bus_config *cfg) {
@@ -68,10 +76,8 @@ static void gpio_setup_out(int gpio, int sig, bool invert) {
 
 /// Resets "Start Pulse" signal when the current row output is done.
 static void IRAM_ATTR i2s_int_hdl(void *arg) {
-  i2s_dev_t *dev = &I2S0;
   if (dev->int_st.out_done) {
-    //gpio_set_level(start_pulse_pin, 1);
-    //gpio_set_level(GPIO_NUM_26, 0);
+    //ets_printf("INT out_done\n"); // Is being called
     output_done = true;
   }
   // Clear the interrupt. Otherwise, the whole device would hang.
@@ -84,13 +90,13 @@ volatile uint8_t IRAM_ATTR *i2s_get_current_buffer() {
 
 bool IRAM_ATTR i2s_is_busy() {
   // DMA and FIFO must be done
-  return !output_done || !I2S0.state.tx_idle;
+  return !output_done || !I2S1.state.tx_idle;
 }
 
 void IRAM_ATTR i2s_switch_buffer() {
   // either device is done transmitting or the switch must be away from the
   // buffer currently used by the DMA engine.
-  while (i2s_is_busy() && dma_desc_addr() != I2S0.out_link.addr) {
+  while (i2s_is_busy() && dma_desc_addr() != I2S1.out_link.addr) {
   };
   current_buffer = !current_buffer;
 }
@@ -98,7 +104,6 @@ void IRAM_ATTR i2s_switch_buffer() {
 void IRAM_ATTR i2s_start_line_output() {
   output_done = false;
 
-  i2s_dev_t *dev = &I2S0;
   dev->conf.tx_start = 0;
   dev->conf.tx_reset = 1;
   dev->conf.tx_fifo_reset = 1;
@@ -126,20 +131,18 @@ void i2s_bus_init(i2s_bus_config *cfg) {
   // store pin in global variable for use in interrupt.
   start_pulse_pin = cfg->start_pulse;
 
-  // Use I2S0 with no signal offset (for some reason the offset seems to be
+  // Use I2S1 with no signal offset (for some reason the offset seems to be
   // needed in 16-bit mode, but not in 8 bit mode.
-  int signal_base = I2S0O_DATA_OUT0_IDX;
+  int signal_base = I2S1O_DATA_OUT0_IDX;
 
   // Setup and route GPIOS
   for (int x = 0; x < 8; x++) {
     gpio_setup_out(I2S_GPIO_BUS[x], signal_base + x, false);
   }
   // Invert word select signal
-  gpio_setup_out(cfg->clock, I2S0O_WS_OUT_IDX, true);
+  gpio_setup_out(cfg->clock, I2S1O_WS_OUT_IDX, true);
 
-  periph_module_enable(PERIPH_I2S0_MODULE);
-
-  i2s_dev_t *dev = &I2S0;
+  periph_module_enable(PERIPH_I2S1_MODULE);
 
   // Initialize device
   dev->conf.tx_reset = 1;
@@ -160,13 +163,13 @@ void i2s_bus_init(i2s_bus_config *cfg) {
   dev->conf2.lcd_tx_wrx2_en = 1;
   dev->conf2.lcd_tx_sdx2_en = 0;
 
-  // Set to 8 bit parallel output
+  // Set to 16 bit parallel output
   dev->sample_rate_conf.val = 0;
-  dev->sample_rate_conf.tx_bits_mod = 8;
+  dev->sample_rate_conf.tx_bits_mod = bus_width;
 
   // Half speed of bit clock in LCD mode.
   // (Smallest possible divider according to the spec).
-  dev->sample_rate_conf.tx_bck_div_num = 2;
+  dev->sample_rate_conf.tx_bck_div_num = clk_divider;
 
 #if defined(CONFIG_EPD_DISPLAY_TYPE_ED097OC4_LQ)
   // Initialize Audio Clock (APLL) for 120 Mhz.
@@ -180,13 +183,16 @@ void i2s_bus_init(i2s_bus_config *cfg) {
   dev->clkm_conf.val = 0;
   #if CONFIG_IDF_TARGET_ESP32S2
     dev->clkm_conf.clk_en = 1;
-  #else 
+  #elseif CONFIG_IDF_TARGET_ESP32
     dev->clkm_conf.clka_en = 1;
   #endif
+
   dev->clkm_conf.clkm_div_a = 1;
   dev->clkm_conf.clkm_div_b = 0;
-  // 2 is the smallest possible divider according to the spec.
-  dev->clkm_conf.clkm_div_num = 2;
+  // 2 is the smallest possible divider according to the spec
+  // For I2S1 it is peripheral_clk / 2 in 8 bit mode while it is peripheral_clk / 4 for I2S1 even in 8 bit mode.
+  // In 16 bit mode it is peripheral_clk / 4 for both I2S1 and I2S1.
+  dev->clkm_conf.clkm_div_num = clk_divider;
 
   // Set up FIFO
   dev->fifo_conf.val = 0;
@@ -221,7 +227,7 @@ void i2s_bus_init(i2s_bus_config *cfg) {
   SET_PERI_REG_BITS(I2S_INT_ENA_REG(1), I2S_OUT_DONE_INT_ENA_V, 1,
                     I2S_OUT_DONE_INT_ENA_S);
   // register interrupt
-  esp_intr_alloc(ETS_I2S0_INTR_SOURCE, 0, i2s_int_hdl, 0, &gI2S_intr_handle);
+  esp_intr_alloc(ETS_I2S1_INTR_SOURCE, 0, i2s_int_hdl, 0, &gI2S_intr_handle);
 
   // Reset FIFO/DMA
   dev->lc_conf.in_rst = 1;
@@ -262,5 +268,5 @@ void i2s_deinit() {
   free((void *)i2s_state.dma_desc_b);
 
   rtc_clk_apll_enable(0, 0, 0, 8, 0);
-  periph_module_disable(PERIPH_I2S0_MODULE);
+  periph_module_disable(PERIPH_I2S1_MODULE);
 }
