@@ -20,6 +20,13 @@ inline int max(int x, int y) { return x > y ? x : y; }
 
 const int clear_cycle_time = 12;
 
+#if CONFIG_IDF_TARGET_ESP32S2
+    // S2 has only core 0
+    uint8_t feed_display_core = 0;
+    #else
+    uint8_t feed_display_core = 1;
+#endif
+
 const int DEFAULT_FRAME_TIME = 120;
 
 #define RTOS_ERROR_CHECK(x)                                                    \
@@ -234,6 +241,8 @@ void epd_clear_area_cycles(EpdRect area, int cycles, int cycle_time) {
 
 
 void epd_init(enum EpdInitOptions options) {
+  printf("epd_init() Buffer size %d*%d/2:%d\n\n", EPD_WIDTH, EPD_HEIGHT, EPD_WIDTH*EPD_HEIGHT/2);
+  
   epd_base_init(EPD_WIDTH);
   epd_temperature_init();
 
@@ -270,7 +279,7 @@ void epd_init(enum EpdInitOptions options) {
 
   RTOS_ERROR_CHECK(xTaskCreatePinnedToCore((void (*)(void *))feed_display,
                                            "epd_feed", 1 << 12, &feed_params,
-                                           5, NULL, 1));
+                                           5, NULL, feed_display_core));
 
   //conversion_lut = (uint8_t *)heap_caps_malloc(1 << 16, MALLOC_CAP_8BIT);
   //assert(conversion_lut != NULL);
