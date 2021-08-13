@@ -11,13 +11,22 @@
 #include "soc/rtc.h"
 #include <esp_log.h>
 
-// #1 I2S 0 does not support 8 bit-mode, DMA should be sent in 16-bit
-// (Not sure how to do that part so Dragon still looks pixelated)
+// #1 I2S 0 does not support 8 bit-mode in ESP32, DMA should be sent in 16-bit
+// Just replace I2S0 for I2S1 in all ocurrences in this file to get it working on ESP32
 i2s_dev_t *dev = &I2S0;
+
+
+// I2S 0 needs to have I2S 0O_DATA_OUTn_IDX offset mode
+// Dragon will get out pixelated is using I2S 0 like this since reads only upper 8 bits (IS 0 forced to 16 bit transmission in ESP32)
+// Not sure what is the right offset but with 8 works the best
+// To be tested: ESP32S2 technical documentation states that works in 8-bit mode
+// https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf#subsection.26.10
+#define SIGNAL_BASE I2S0O_DATA_OUT0_IDX
+
 // I2S 0 needs a slower clock: https://github.com/TobleMiner/esp_i2s_parallel#i2s0-vs-i2s1
 // But seems that still works also with clk_divider = 2
 const uint8_t clk_divider = 2;
-const uint8_t bus_width = 16;
+const uint8_t bus_width = 8;
 uint16_t printCount = 0;
 
 /// DMA descriptors for front and back line buffer.
@@ -46,7 +55,7 @@ static volatile bool output_done = true;
 /// interrupt.
 static gpio_num_t start_pulse_pin;
 
-// I2S0: Even if you do only need 8 bits of bus-width the data samples provided in memory must still have a width of 16 bit.
+// I2S 0: Even if you do only need 8 bits of bus-width the data samples provided in memory must still have a width of 16 bit.
 /// Initializes a DMA descriptor.
 static void fill_dma_desc(volatile lldesc_t *dmadesc, uint8_t *buf,
                           i2s_bus_config *cfg) {
@@ -144,12 +153,7 @@ void i2s_bus_init(i2s_bus_config *cfg) {
 
   // Use I2S 1 with no signal offset: I2S0O_DATA_OUT0_IDX 
   // (for some reason the offset seems to be needed in 16-bit mode, but not in 8 bit mode)
-  // I2S 0 needs to have I2S 0O_DATA_OUTn_IDX offset mode
-  // Not sure what is the right offset but with 8 works the best
-  int signal_base = I2S0O_DATA_OUT8_IDX; 
-  if (bus_width == 8) {
-    signal_base = I2S0O_DATA_OUT0_IDX;
-  }
+  int signal_base = SIGNAL_BASE; 
 
   // Setup and route GPIOS
   for (int x = 0; x < bus_width; x++) {
